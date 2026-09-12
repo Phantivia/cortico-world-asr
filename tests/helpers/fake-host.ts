@@ -1,4 +1,4 @@
-/** World测试共用的 fake host:记录推送的事件与唤醒口径,其余宿主接口都是空实现。 */
+/** World 测试共用的 fake host:记录推送的事件与唤醒口径,其余宿主接口都是空实现。 */
 import type { EventEnvelope, WorldHost, PushOptions } from 'cortico/core/types.ts';
 
 export class FakeHost implements WorldHost {

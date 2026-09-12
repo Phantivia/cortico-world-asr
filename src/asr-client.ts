@@ -3,7 +3,7 @@
  *
  * 协议只认 **OpenAI 兼容的 `POST /audio/transcriptions`**(multipart,字段 `file`)。
  * 本地 FireRedASR2-AED 的 CPU 与 CUDA 档都使用这条协议，换档、换权重、
- * 换成别的本地实现,模组这一侧一个字都不用动。
+ * 换成别的本地实现,World 这一侧一个字都不用动。
  *
  * 请求带 `language`:中文场景下不指定语言时,whisper 系模型会拿前几百毫秒去猜,
  * 短句上猜错的代价是整句变成日文假名。

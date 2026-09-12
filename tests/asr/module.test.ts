@@ -27,11 +27,11 @@ function loud(): Int16Array {
 }
 
 /**
- * 假声卡:握着模组给的 onFrame,测试自己决定什么时候有声音。
+ * 假声卡:握着 World 给的 onFrame,测试自己决定什么时候有声音。
  * `streamPort: 0` 让识别流挑一个随机空闲口,测试之间不打架。
  */
 function rig(over: Partial<AsrConfigSection> = {}, transcripts: string[] = ['听得见吗']) {
-  // autoStart 默认关:测试机上要是真有权重,模组启动会去 spawn 一台 whisper-server
+  // autoStart 默认关:测试机上要是真有权重,World 启动会去 spawn 一台 whisper-server
   const config = cfg({
     streamPort: 0,
     autoListen: false,
@@ -57,7 +57,7 @@ function rig(over: Partial<AsrConfigSection> = {}, transcripts: string[] = ['听
     captureOverride: capture as never,
     clientOverride: { transcribe },
   });
-  // 采集替身没有真回调,把模组的 onFrame 借出来
+  // 采集替身没有真回调,把 World 的 onFrame 借出来
   onFrame = (f: Int16Array) => (m as any).onFrame(f);
   const speak = (ms: number, frame: Int16Array): void => {
     for (let t = 0; t < ms; t += 20) onFrame!(frame);
@@ -76,7 +76,7 @@ async function settle(tick: () => void, rounds = 4): Promise<void> {
   }
 }
 
-describe('模组面', () => {
+describe('World 面', () => {
   it('没有工具:听是纯入站的事', () => {
     expect(new AsrModule({ cfg: cfg() }).tools()).toEqual([]);
   });
@@ -120,7 +120,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
     expect(host.events).toHaveLength(1);
     expect(host.events[0].type).toBe('asr.speech');
     expect(host.events[0].text).toBe(`[语音] ${ASR_MODULE_DEFAULTS.speaker}:听得见吗`);
-    expect(host.pushOpts[0]).toMatchObject({ trigger: 'preempt' });
+    expect(host.pushOpts[0]).toMatchObject({ trigger: 'flush' });
     await m.stop();
   });
 
@@ -170,7 +170,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
     await m.stop();
   });
 
-  it('停顿长于收尾静音就是两次开口:各自发车,后到的由总线 preempt 收拢', async () => {
+  it('停顿长于收尾静音就是两次开口:各自发车,后到的由总线下一批收拢', async () => {
     const { m, speak, invoke } = rig({}, ['前半句已经说完', '后半句接着说']);
     const host = new FakeHost();
     await m.start(host);
@@ -183,7 +183,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
     speak(700, FRAME);
     await new Promise((r) => setTimeout(r, 30));
     expect(host.events).toHaveLength(2);
-    expect(host.pushOpts.every((o) => o?.trigger === 'preempt')).toBe(true);
+    expect(host.pushOpts.every((o) => o?.trigger === 'flush')).toBe(true);
     await m.stop();
   });
 

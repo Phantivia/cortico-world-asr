@@ -2,7 +2,7 @@
 
 [Cortico](https://github.com/Phantivia/Cortico) 的语音识别 World,以独立 npm 包发布。
 
-麦克风里的话经切分、识别、打包,作为外部事件进入上下文。World **没有工具**:听是纯入站的事,
+麦克风里的话经切分、识别、打包,作为外部事件进入上下文。 World **没有工具**:听是纯入站的事,
 表达通道是嘴(cortico-world-vtuber)或文字,不在这儿。
 
 ## 与 Cortico 的关系
@@ -51,7 +51,7 @@ module.ts      装配:配置、面板、事件投递
 声卡 → 切分 → 识别端点 → 打包投递
 ```
 
-模组跑在主进程里,不像 cortico-world-vtuber 那样开子进程:这条链上唯一的常驻计算是每帧一次
+World 跑在主进程里,不像 cortico-world-vtuber 那样开子进程:这条链上唯一的常驻计算是每帧一次
 均方根(20ms 一帧、320 个样本),识别本身在另一个进程/另一台机器上。没有 60Hz 的
 同步工作要隔离,子进程只会多一层 IPC。
 
@@ -115,7 +115,7 @@ Windows 安装：`pwsh -File scripts/setup-firered-asr.ps1`，需要 Git 与 uv�
 不会变成两批。所以这一层只剩三个数:
 
 - `joinGapMs` 转写落地后**额外**再空等多久(默认 0)。给多少就直接加多少响应延迟;
-  收尾静音之外真正需要它的场合已经没有了,后到的句子由总线的 preempt 覆盖。
+  收尾静音之外真正需要它的场合已经没有了,后到的句子由总线下一批带走。
 - `maxHoldMs` 一条最多攒这么久。只在 `joinGapMs > 0` 时才有机会当判据。
 - `minChars` 少于这么多字的结果丢掉:噪声与语气词识别出来常是一两个字。
 
@@ -139,12 +139,12 @@ whisper 系模型在纯噪声上会稳定地吐出训练集里的高频片段("�
 
 | 事件 | 触发 | 说明 |
 | --- | --- | --- |
-| `asr.speech` | `preempt`(`worlds.asr.wake` 关掉则 `debounce`) | `[语音] <说话人>:<话>` |
+| `asr.speech` | `flush`(`worlds.asr.wake` 关掉则 `debounce`) | `[语音] <说话人>:<话>` |
 
 识别分不出是谁在说,`worlds.asr.speaker` 就是事件里那个"谁"。
 
-`preempt` 保持事件 FIFO，整批立即发车。主模型仍在 thinking/prefill、尚未开出任何
-演出或工具时会取消该轮并用合并后的新批重发；已经外化的轮不自动取消，已排队音频也不受影响。
+`flush` 保持事件 FIFO，整批立即发车：到达就冲洗合批窗口，把积压一起带走，
+不打断在途的那一轮——后到的话等这轮说完再进下一批。
 
 ## Overlay 字幕
 
@@ -160,7 +160,7 @@ URL 参数按订阅方覆盖:`?lines=3` 只留三行、`?partial=0` 不显示"�
 ## 控制台面板
 
 - **收听(listen)**:麦克风选择、带门槛刻度的电平条、识别后端启停、实时识别文本。
-  电平与文本走 `ctx.stream`(模组的 `ModuleConsoleDecl.stream`)实时推,计数与后端
+  电平与文本走 `ctx.stream`(World 的 `ModuleConsoleDecl.stream`)实时推,计数与后端
   状态五秒轮一次——能推的别轮询。
 - **Overlay 字幕(overlay)**:链接、样式、试显、预览。
 
@@ -177,5 +177,5 @@ if (cfg.worlds.asr.enabled) {
 }
 ```
 
-麦克风与字幕样式是在面板上调的,调完要留住:模组只管当场生效,落盘经装配层
+麦克风与字幕样式是在面板上调的,调完要留住:World 只管当场生效,落盘经装配层
 (与 cortico-world-vtuber 的 overlay/TTS 档案同一套办法)。

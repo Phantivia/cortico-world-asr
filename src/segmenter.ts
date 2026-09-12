@@ -208,7 +208,7 @@ export class Segmenter {
 export interface PackConfig {
   /**
    * 转写落地且收尾静音结束后的额外等待时间（ms），默认 0。
-   * silenceMs 与 settleRemainingMs 处理短停顿合并；后到句子通过总线 preempt 覆盖。正值直接增加响应延迟。
+   * silenceMs 与 settleRemainingMs 处理短停顿合并；后到句子由总线下一批带走。正值直接增加响应延迟。
    */
   joinGapMs: number;
   /** 一条最多攒多久(ms):再连着说也要发车 */
@@ -225,7 +225,7 @@ export const PACK_DEFAULTS: PackConfig = {
 
 /**
  * 识别结果的攒批。`add` 收句子,`due` 到点交货——**时钟由调用方给**,
- * 这样测试不必等真时间,模组也只有一处定时器。
+ * 这样测试不必等真时间,World 也只有一处定时器。
  *
  * `hold` 是这里唯一真正管事的判据:上游(麦克风、转写队列、收尾静音)只要还有一件
  * 没完,批次就按着不动。`hold` 一撤,默认就是立刻发车。

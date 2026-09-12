@@ -2,7 +2,7 @@
  * AsrModule — 语音识别接入(worlds-asr)。
  *
  * 定位:**她的耳朵**。麦克风里的话经切分、识别、打包,作为外部事件送进她的
- * 上下文。模组没有工具——听是纯入站的事,她的表达通道是嘴(worlds-vtuber)或文字,
+ * 上下文。 World 没有工具——听是纯入站的事,她的表达通道是嘴(worlds-vtuber)或文字,
  * 不在这儿。
  *
  * 一条链路四段,每段都能单独换掉:
@@ -13,7 +13,7 @@
  * 由 `asr-server.ts` 管起停。换档、换权重、换别的本地实现都不动这一侧。
  *
  * 事件词表(何时唤醒 × 何时成文):
- *   asr.speech   听见有人说话   preempt 或 debounce,见 worlds.asr.wake
+ *   asr.speech   听见有人说话   flush 或 debounce,见 worlds.asr.wake
  *
  * 识别结果**不逐句投递**:人说话是一串短句,逐句唤醒等于把一段话拆成五次打断。
  * 停顿短于收尾静音的相邻句子并成一条;送去转写用的是更短的那一级门限,所以转写跑在
@@ -96,7 +96,7 @@ export const ASR_MODULE_DEFAULTS = {
   enabled: false,
   /** 麦克风名字子串;空 = 系统默认输入设备 */
   device: '',
-  /** 模组启动就开始听;关掉则只在控制台按下"开始收听"时听 */
+  /** World 启动就开始听;关掉则只在控制台按下"开始收听"时听 */
   autoListen: true,
   /** 说话人在事件里怎么称呼。识别不出是谁在说,这就是那个"谁" */
   speaker: '麦克风前的人',
@@ -120,7 +120,7 @@ export const ASR_MODULE_DEFAULTS = {
     /** 识别结果统一转简体 */
     simplified: true,
     /**
-     * 模组启动时探测端点，不可达则拉起自带后端；stop() 终止托管后端。
+     * World 启动时探测端点，不可达则拉起自带后端；stop() 终止托管后端。
      */
     autoStart: true,
     /** 兼容端点的语言提示;FireRed AED 不强制语言 */
@@ -192,7 +192,7 @@ export const ASR_CONFIG_GROUP: ConfigGroup = {
       },
       'worlds.asr.autoListen': {
         type: 'boolean', title: '启动即收听', 'x-hot': false,
-        description: '关掉则模组只把后端带起来,听不听在面板上按。',
+        description: '关掉则 World 只把后端带起来,听不听在面板上按。',
       },
       'worlds.asr.speaker': {
         type: 'string', title: '说话人称呼', 'x-hot': true,
@@ -200,7 +200,7 @@ export const ASR_CONFIG_GROUP: ConfigGroup = {
       },
       'worlds.asr.wake': {
         type: 'boolean', title: '听见就叫醒', 'x-hot': true,
-        description: '开着时立即投递，并抢占尚未开始说话或执行工具的在途思考；关掉则排进常规合批。',
+        description: '开着时立即投递，把积压一起带走；关掉则排进常规合批。',
       },
       'worlds.asr.corrections': {
         type: 'string', title: '出口纠错表', 'x-hot': true,
@@ -238,8 +238,8 @@ export const ASR_CONFIG_GROUP: ConfigGroup = {
       },
       'worlds.asr.backend.autoStart': {
         type: 'boolean', title: '启动时拉起自带后端', 'x-hot': true,
-        description: '模组启动时端点探不通就拉起自带后端；关掉则只在「收听」面板里手动起。'
-          + '模组停止会把托管的后端一起停掉，所以关着它时每次重启都得去面板点一下。',
+        description: 'World 启动时端点探不通就拉起自带后端；关掉则只在「收听」面板里手动起。'
+          + 'World 停止会把托管的后端一起停掉，所以关着它时每次重启都得去面板点一下。',
       },
       'worlds.asr.backend.timeoutMs': {
         type: 'integer', title: '识别超时', minimum: 1000, maximum: 120_000,
@@ -523,12 +523,12 @@ export class AsrModule implements World {
     // 自带后端(权重在健康巡检里异步加载,就绪前的句子照常报识别失败)。
     const alive = await this.server.probe();
     if (alive) {
-      host.log.info(`语音识别模组已启动,后端 ${this.cfg.backend.baseUrl} 就绪,字幕页 ${this.stream.overlayUrl}`);
+      host.log.info(`语音识别 World 已启动,后端 ${this.cfg.backend.baseUrl} 就绪,字幕页 ${this.stream.overlayUrl}`);
       return;
     }
     if (!this.cfg.backend.autoStart) {
       host.log.warn(
-        `语音识别模组已启动,后端 ${this.cfg.backend.baseUrl} 未就绪(识别会全部失败,去面板拉起后端),字幕页 ${this.stream.overlayUrl}`,
+        `语音识别 World 已启动,后端 ${this.cfg.backend.baseUrl} 未就绪(识别会全部失败,去面板拉起后端),字幕页 ${this.stream.overlayUrl}`,
       );
       this.detail = '后端未就绪';
       return;
@@ -536,13 +536,13 @@ export class AsrModule implements World {
     const state = await this.server.start();
     if (state.phase === 'error') {
       host.log.warn(
-        `语音识别模组已启动,后端 ${this.cfg.backend.baseUrl} 未就绪,自带后端拉不起来: ${state.detail ?? '原因未知'}(识别会全部失败),字幕页 ${this.stream.overlayUrl}`,
+        `语音识别 World 已启动,后端 ${this.cfg.backend.baseUrl} 未就绪,自带后端拉不起来: ${state.detail ?? '原因未知'}(识别会全部失败),字幕页 ${this.stream.overlayUrl}`,
       );
       this.detail = `后端拉不起来: ${state.detail ?? '原因未知'}`;
       return;
     }
     host.log.info(
-      `语音识别模组已启动,后端 ${this.cfg.backend.baseUrl} 未就绪,已拉起自带后端(${state.detail ?? '启动中'}),字幕页 ${this.stream.overlayUrl}`,
+      `语音识别 World 已启动,后端 ${this.cfg.backend.baseUrl} 未就绪,已拉起自带后端(${state.detail ?? '启动中'}),字幕页 ${this.stream.overlayUrl}`,
     );
     this.detail = '后端启动中';
   }
@@ -553,7 +553,7 @@ export class AsrModule implements World {
     this.tickTimer = null;
     if (this.packTimer) clearTimeout(this.packTimer);
     this.packTimer = null;
-    for (const s of [...this.panelSockets]) s.close('模组停止');
+    for (const s of [...this.panelSockets]) s.close('World 停止');
     this.panelSockets.clear();
     await this.stream.stop();
     await this.server.stop();
@@ -723,7 +723,7 @@ export class AsrModule implements World {
           text: `[语音] ${this.cfg.speaker}:${text}`,
           senderKey: `asr:${this.cfg.speaker}`,
         },
-        { trigger: this.cfg.wake ? 'preempt' : 'debounce' },
+        { trigger: this.cfg.wake ? 'flush' : 'debounce' },
       )
       .catch((e) => host.log.warn('语音事件投递失败', { err: String(e) }));
   }
