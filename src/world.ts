@@ -1,5 +1,5 @@
 /**
- * AsrModule — 语音识别接入(worlds-asr)。
+ * AsrWorld — 语音识别接入(worlds-asr)。
  *
  * 定位:**她的耳朵**。麦克风里的话经切分、识别、打包,作为外部事件送进她的
  * 上下文。 World 没有工具——听是纯入站的事,她的表达通道是嘴(worlds-vtuber)或文字,
@@ -21,8 +21,8 @@
  */
 import { fileURLToPath } from 'node:url';
 import type {
-  ConfigGroup, World, WorldHost, Logger, ModuleConsoleDecl, ModuleLamp, ModulePanelDecl,
-  ModuleStreamSocket, ToolDef,
+  ConfigGroup, World, WorldHost, Logger, WorldConsoleDecl, WorldLamp, WorldPanelDecl,
+  WorldStreamSocket, ToolDef,
 } from 'cortico/core/types.ts';
 import { nowIso } from 'cortico/core/util.ts';
 import { AsrClient, looksHallucinated } from './asr-client.ts';
@@ -45,7 +45,7 @@ const RECENT_CAP = 50;
 /** 识别失败的告警间隔:后端一死就每句失败一次,原样刷屏会淹掉别的日志 */
 const FAIL_WARN_GAP_MS = 60_000;
 
-export const ASR_PANEL_DECLS: readonly ModulePanelDecl[] = [
+export const ASR_PANEL_DECLS: readonly WorldPanelDecl[] = [
   { id: 'listen', title: '收听', description: '麦克风、识别后端、电平与实时识别文本。' },
   { id: 'overlay', title: 'Overlay 字幕', description: '推流链接、字幕样式与试显。' },
 ];
@@ -91,7 +91,7 @@ export const ASR_OVERLAY_DEFAULTS: AsrOverlayConfig = {
   },
 };
 
-export const ASR_MODULE_DEFAULTS = {
+export const ASR_DEFAULTS = {
   // enabled 由Persona的装配层显式开启。
   enabled: false,
   /** 麦克风名字子串;空 = 系统默认输入设备 */
@@ -176,8 +176,8 @@ export interface AsrConfigSection {
 }
 
 export const ASR_CONFIG_GROUP: ConfigGroup = {
-  id: 'module:asr',
-  owner: 'module:asr',
+  id: 'world:asr',
+  owner: 'world:asr',
   schema: {
     type: 'object',
     title: '语音识别 · 接入与后端',
@@ -258,8 +258,8 @@ export const ASR_CONFIG_GROUP: ConfigGroup = {
 };
 
 export const ASR_SEGMENT_CONFIG_GROUP: ConfigGroup = {
-  id: 'module:asr:segment',
-  owner: 'module:asr',
+  id: 'world:asr:segment',
+  owner: 'world:asr',
   schema: {
     type: 'object',
     title: '语音识别 · 切分与投递',
@@ -403,7 +403,7 @@ export interface AsrOverlayState {
   config: AsrOverlayConfig;
 }
 
-interface AsrModuleOptions {
+interface AsrWorldOptions {
   cfg: AsrConfigSection;
   timezone?: string;
   /** 麦克风改动后回调(装配层写回 config.json) */
@@ -418,7 +418,7 @@ interface AsrModuleOptions {
   captureOverride?: Pick<MicCapture, 'start' | 'stop' | 'running' | 'current' | 'devices'>;
 }
 
-export class AsrModule implements World {
+export class AsrWorld implements World {
   readonly id = 'asr';
 
   private host: WorldHost | null = null;
@@ -449,11 +449,11 @@ export class AsrModule implements World {
   private lastFailWarnAt = 0;
   private failWarnSuppressed = 0;
   /** 面板的实时通道 */
-  private readonly panelSockets = new Set<ModuleStreamSocket>();
+  private readonly panelSockets = new Set<WorldStreamSocket>();
   private lastSpeaking = false;
   private readonly fallbackLog: Logger;
 
-  constructor(opts: AsrModuleOptions) {
+  constructor(opts: AsrWorldOptions) {
     this.cfg = opts.cfg;
     this.packTiming = {
       joinGapMs: this.cfg.pack.joinGapMs,
@@ -762,7 +762,7 @@ export class AsrModule implements World {
    * 分开点是因为它们坏起来互不相干——后端挂了麦照样在收(只是没人翻译),
    * 字幕页没起不影响听见。一颗聚合灯只能报最坏的那条,看的人还得自己去猜是哪条。
    */
-  private lamps(): ModuleLamp[] {
+  private lamps(): WorldLamp[] {
     const phase = this.server.currentPhase;
     return [
       {
@@ -792,7 +792,7 @@ export class AsrModule implements World {
     ];
   }
 
-  console(): ModuleConsoleDecl {
+  console(): WorldConsoleDecl {
     const last = this.recent[0];
     return {
       lamps: this.lamps(),

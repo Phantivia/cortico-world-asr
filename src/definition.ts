@@ -1,12 +1,12 @@
 import type { WorldDefinition } from 'cortico/world.ts';
-import { ASR_MODULE_DEFAULTS, AsrModule, type AsrConfigSection } from './module.ts';
+import { ASR_DEFAULTS, AsrWorld, type AsrConfigSection } from './world.ts';
 
 export const ASR: WorldDefinition<AsrConfigSection> = {
   id: 'asr',
   label: '语音识别',
-  defaults: () => structuredClone(ASR_MODULE_DEFAULTS as unknown as AsrConfigSection),
+  defaults: () => structuredClone(ASR_DEFAULTS as unknown as AsrConfigSection),
   create: (ctx) =>
-    new AsrModule({
+    new AsrWorld({
       cfg: ctx.cfg,
       timezone: ctx.timezone,
       onDevice: (device) => ctx.persist({ device }),

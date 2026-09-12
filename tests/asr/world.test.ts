@@ -1,19 +1,19 @@
 /**
- * AsrModule:声卡 → 切分 → 识别 → 打包投递这条链,以及控制台面板。
+ * AsrWorld:声卡 → 切分 → 识别 → 打包投递这条链,以及控制台面板。
  *
  * 声卡与识别端点都由注入替身顶掉——前者本机不一定有,后者要真跑一台 whisper。
  * 替身之外的每一段(切分、幻觉过滤、攒批、投递口径、面板状态)都是真代码。
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
-  AsrModule, ASR_MODULE_DEFAULTS, clampOverlay, portOf,
+  AsrWorld, ASR_DEFAULTS, clampOverlay, portOf,
   type AsrConfigSection, type AsrListenState, type AsrOverlayState,
-} from '../../src/module.ts';
-import { ASR_OVERLAY_DEFAULTS } from '../../src/module.ts';
+} from '../../src/world.ts';
+import { ASR_OVERLAY_DEFAULTS } from '../../src/world.ts';
 import { FakeHost } from '../helpers/fake-host.ts';
 
 function cfg(over: Partial<AsrConfigSection> = {}): AsrConfigSection {
-  return structuredClone({ ...ASR_MODULE_DEFAULTS, enabled: true, ...over }) as AsrConfigSection;
+  return structuredClone({ ...ASR_DEFAULTS, enabled: true, ...over }) as AsrConfigSection;
 }
 
 const RATE = 16_000;
@@ -36,7 +36,7 @@ function rig(over: Partial<AsrConfigSection> = {}, transcripts: string[] = ['听
     streamPort: 0,
     autoListen: false,
     ...over,
-    backend: { ...ASR_MODULE_DEFAULTS.backend, autoStart: false, ...(over.backend ?? {}) },
+    backend: { ...ASR_DEFAULTS.backend, autoStart: false, ...(over.backend ?? {}) },
   });
   let onFrame: ((f: Int16Array) => void) | null = null;
   const capture = {
@@ -52,7 +52,7 @@ function rig(over: Partial<AsrConfigSection> = {}, transcripts: string[] = ['听
     ms: 42,
     error: null as string | null,
   }));
-  const m = new AsrModule({
+  const m = new AsrWorld({
     cfg: config,
     captureOverride: capture as never,
     clientOverride: { transcribe },
@@ -78,24 +78,24 @@ async function settle(tick: () => void, rounds = 4): Promise<void> {
 
 describe('World 面', () => {
   it('没有工具:听是纯入站的事', () => {
-    expect(new AsrModule({ cfg: cfg() }).tools()).toEqual([]);
+    expect(new AsrWorld({ cfg: cfg() }).tools()).toEqual([]);
   });
 
   it('环境提示词的洞只有"她听见的是谁"', () => {
-    const m = new AsrModule({ cfg: cfg({ speaker: '老板' }) });
+    const m = new AsrWorld({ cfg: cfg({ speaker: '老板' }) });
     expect(m.envPromptVars()).toEqual({ 'asr.speaker': '老板' });
   });
 
   it('面板声明是局部 id + 真标题', () => {
-    const decl = new AsrModule({ cfg: cfg() }).console();
+    const decl = new AsrWorld({ cfg: cfg() }).console();
     expect(decl.panels?.map((p) => p.id)).toEqual(['listen', 'overlay']);
     for (const p of decl.panels ?? []) expect(p.description).toBeTruthy();
-    expect(decl.config?.map((g) => g.id)).toEqual(['module:asr', 'module:asr:segment']);
-    for (const g of decl.config ?? []) expect(g.owner).toBe('module:asr');
+    expect(decl.config?.map((g) => g.id)).toEqual(['world:asr', 'world:asr:segment']);
+    for (const g of decl.config ?? []) expect(g.owner).toBe('world:asr');
   });
 
   it('声明的每个配置键都能在默认值里找到落点', () => {
-    const decl = new AsrModule({ cfg: cfg() }).console();
+    const decl = new AsrWorld({ cfg: cfg() }).console();
     for (const group of decl.config ?? []) {
       for (const key of Object.keys(group.schema.properties)) {
         const path = key.split('.').slice(1); // 去掉 worlds. 前缀
@@ -119,7 +119,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
     expect(transcribe).toHaveBeenCalledTimes(1);
     expect(host.events).toHaveLength(1);
     expect(host.events[0].type).toBe('asr.speech');
-    expect(host.events[0].text).toBe(`[语音] ${ASR_MODULE_DEFAULTS.speaker}:听得见吗`);
+    expect(host.events[0].text).toBe(`[语音] ${ASR_DEFAULTS.speaker}:听得见吗`);
     expect(host.pushOpts[0]).toMatchObject({ trigger: 'flush' });
     await m.stop();
   });
@@ -313,7 +313,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
   // start() 从不拉起后端(只有面板与 setModel 会),stop() 却会杀掉它:core 重启一次,
   // 就变成麦克风在收、后端已死,而控制台仍显示已启动。
   it('关掉自动拉起:启动时探不通就 warn,并把「后端未就绪」摆到面板上', async () => {
-    const { m, invoke } = rig({ backend: { ...ASR_MODULE_DEFAULTS.backend, baseUrl: 'http://127.0.0.1:1/v1', autoStart: false } });
+    const { m, invoke } = rig({ backend: { ...ASR_DEFAULTS.backend, baseUrl: 'http://127.0.0.1:1/v1', autoStart: false } });
     const host = new FakeHost();
     const logs: Array<{ level: string; msg: string }> = [];
     const rec = {
@@ -336,7 +336,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
   it('自动拉起:探不通就起自带后端,起不来把原因摆到日志与面板上', async () => {
     const { m, invoke } = rig({
       backend: {
-        ...ASR_MODULE_DEFAULTS.backend,
+        ...ASR_DEFAULTS.backend,
         baseUrl: 'http://127.0.0.1:1/v1',
         autoStart: true,
         // 绝对路径且不存在:launch 解析在 spawn 之前就失败,测试机上不会真起一台 whisper
@@ -409,7 +409,7 @@ describe('收听面板', () => {
 
   it('换设备经回调落盘', async () => {
     const seen: string[] = [];
-    const m = new AsrModule({
+    const m = new AsrWorld({
       cfg: cfg({ streamPort: 0, autoListen: false }),
       onDevice: (d) => seen.push(d),
       captureOverride: { running: false, current: null, devices: () => [], start: () => null, stop: () => {} } as never,
@@ -491,7 +491,7 @@ describe('中文字形与权重选择', () => {
     const { m, speak, tick, invoke } = rig(
       {
         pack: { joinGapMs: 0, maxHoldMs: 8000, minChars: 2 },
-        backend: { ...ASR_MODULE_DEFAULTS.backend, simplified: false } as never,
+        backend: { ...ASR_DEFAULTS.backend, simplified: false } as never,
       },
       ['今天天氣不錯'],
     );

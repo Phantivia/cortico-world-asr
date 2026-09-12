@@ -9,4 +9,4 @@ import { ASR } from './definition.ts';
 export default ASR;
 
 export { ASR };
-export type { AsrConfigSection, AsrOverlayConfig, AsrSubtitleStyle } from './module.ts';
+export type { AsrConfigSection, AsrOverlayConfig, AsrSubtitleStyle } from './world.ts';

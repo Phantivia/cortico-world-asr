@@ -18,7 +18,7 @@ import { listenPanel } from './listen.ts';
 import { overlayPanel } from './overlay.ts';
 
 // ---------------------------------------------------------------------------
-// 共享类型:服务端 `AsrModule.invokePanel` 各方法的返回形状
+// 共享类型:服务端 `AsrWorld.invokePanel` 各方法的返回形状
 // ---------------------------------------------------------------------------
 
 interface AsrMicDevice {
