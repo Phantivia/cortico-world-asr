@@ -1,0 +1,79 @@
+/*
+ * 语音识别面板的专有样式。
+ *
+ * 只放 `ctx.ui` 没有对应原语的那三块:电平条(带门槛刻度)、一行排开的表单块、
+ * 字幕预览框。其余一律用原语(sheet / rowbar / section / btn / kv / log / stat /
+ * field / checkbox / select),那些 class 归控制台管,这里一个字都不覆盖。
+ *
+ * 两条自律(与 mc、QQ 那两份同源):类名一律 `asr-` 前缀;颜色只用控制台的主题变量。
+ *
+ * 电平条不用 `ui.progress`:那是"这个数占多少"的读数条,而这里要的是**门槛刻度**
+ * ——条走到哪不重要,过没过那道线才是唯一要看的事。
+ */
+
+/* ---- 识别后端那一行的状态词配色(借用 .mountrow 的版式) ---- */
+.mountrow .mstate.asr-on { color: var(--ok); }
+.mountrow .mstate.asr-off { color: var(--danger); }
+.mountrow .mstate.asr-warn { color: var(--ink-soft); }
+
+/* ---- 一行排开的表单块 ---- */
+.asr-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 14px;
+  margin: 6px 0 2px;
+}
+.asr-form .fieldrow { margin: 0; }
+.asr-form .fieldrow > input.field { width: 8em; }
+.asr-form .fieldrow > select.field { min-width: 12em; }
+
+/* ---- 电平条 ---- */
+.asr-meterrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.asr-meter {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--sheet-3);
+  border: 1px solid var(--line-2);
+  overflow: hidden;
+}
+.asr-meterfill {
+  height: 100%;
+  width: 0;
+  background: var(--line-strong);
+  transition: width 90ms linear;
+}
+/* 越过门槛(判为"在说话")时换成强调色:这一眼就是门槛调对没有 */
+.asr-meterfill.on { background: var(--accent); }
+/* 门槛刻度 */
+.asr-metermark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+.asr-readout {
+  min-width: 8.5em;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 字幕预览:嵌的就是 OBS 里那一份 overlay 页 ---- */
+.asr-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: #1c1a17;
+  margin-top: 6px;
+}

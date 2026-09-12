@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.log
+# FireRed 的 Python 环境、上游代码与权重都装在这里,不进版本库。
+runtime/
