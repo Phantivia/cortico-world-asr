@@ -11,7 +11,7 @@ import time
 import unittest
 import wave
 
-spec = importlib.util.spec_from_file_location('firered_server', Path(__file__).parents[3] / 'src/worlds/asr/firered-server.py')
+spec = importlib.util.spec_from_file_location('firered_server', Path(__file__).parents[2] / 'src/firered-server.py')
 server_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(server_module)
 
