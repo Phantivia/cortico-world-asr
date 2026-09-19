@@ -36,10 +36,28 @@ export interface AsrServerState {
   reachable: boolean;
   model: string | null;
   profile: string;
-  /** 这一档的二进制在不在位 */
+  /** 有一个能跑的运行时目录(托管装的或自备的) */
   installed: boolean;
-  /** models/ 下所有权重 */
+  modelsDir: string;
+  /** 权重根下每一组完整权重 */
   models: string[];
+}
+
+/** `listen.runtime` */
+export interface AsrRuntimeState {
+  revision: string;
+  key: string | null;
+  dir: string;
+  own: boolean;
+  supported: boolean;
+  install: { phase: 'absent' | 'installing' | 'installed' | 'error'; step: string | null; line: string | null; detail: string | null };
+  models: Array<{
+    file: string; path: string; phase: 'absent' | 'downloading' | 'present' | 'error';
+    bytes: number; done: number; total: number | null; detail: string | null;
+  }>;
+  modelsDir: string;
+  modelsSource: string;
+  modelsComplete: boolean;
 }
 
 /** `listen.state` */

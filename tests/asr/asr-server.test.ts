@@ -7,21 +7,24 @@ import type { Logger } from 'cortico/core/types.ts';
 import { AsrServerManager, binPath, listModels, pickModel } from '../../src/asr-server.ts';
 import { nullLogger } from 'cortico/core/util.ts';
 
+/** A usable runtime directory plus a models root holding the named complete weight sets. */
 function layout(names = ['FireRedASR2-AED']) {
-  const dir = mkdtempSync(join(tmpdir(), 'asr-firered-'));
+  const root = mkdtempSync(join(tmpdir(), 'asr-firered-'));
+  const runtime = join(root, 'runtime');
+  const models = join(root, 'models', 'asr');
   for (const name of names) {
-    mkdirSync(join(dir, 'models', name), { recursive: true });
+    mkdirSync(join(models, name), { recursive: true });
     for (const file of ['model.pth.tar', 'cmvn.ark', 'dict.txt', 'train_bpe1000.model'])
-      writeFileSync(join(dir, 'models', name, file), 'fixture');
+      writeFileSync(join(models, name, file), 'fixture');
   }
-  mkdirSync(dirname(binPath(dir)), { recursive: true });
-  writeFileSync(binPath(dir), 'fixture');
-  mkdirSync(join(dir, 'FireRedASR2S', 'fireredasr2s'), { recursive: true });
-  writeFileSync(join(dir, 'FireRedASR2S', 'fireredasr2s', '__init__.py'), '');
-  return dir;
+  mkdirSync(dirname(binPath(runtime)), { recursive: true });
+  writeFileSync(binPath(runtime), 'fixture');
+  mkdirSync(join(runtime, 'FireRedASR2S', 'fireredasr2s'), { recursive: true });
+  writeFileSync(join(runtime, 'FireRedASR2S', 'fireredasr2s', '__init__.py'), '');
+  return { runtime, models };
 }
-function manager(dir: string, modelFile = '', profile: 'gpu' | 'cpu' = 'gpu', overrides: object = {}) {
-  return new AsrServerManager({ serverDir: dir, modelFile: () => modelFile, profile: () => profile,
+function manager(l: { runtime: string; models: string }, modelFile = '', profile: 'gpu' | 'cpu' = 'gpu', overrides: object = {}) {
+  return new AsrServerManager({ runtimeDir: () => l.runtime, modelsDir: l.models, modelFile: () => modelFile, profile: () => profile,
     port: () => 1, threads: () => 0, log: nullLogger(), ...overrides });
 }
 function launch(m: AsrServerManager) {
@@ -37,32 +40,38 @@ async function freePort() {
 
 describe('FireRed runtime and model paths', () => {
   it('discovers complete model directories and uses one runtime for both devices', () => {
-    const dir = layout(['custom', 'FireRedASR2-AED']);
-    expect(listModels(dir)).toHaveLength(2);
-    expect(pickModel(dir)).toBe(join('FireRedASR2-AED', 'model.pth.tar'));
-    const gpu = launch(manager(dir));
-    const cpu = launch(manager(dir, '', 'cpu'));
+    const l = layout(['custom', 'FireRedASR2-AED']);
+    expect(listModels(l.models)).toHaveLength(2);
+    expect(pickModel(l.models)).toBe(join('FireRedASR2-AED', 'model.pth.tar'));
+    const gpu = launch(manager(l));
+    const cpu = launch(manager(l, '', 'cpu'));
     expect(gpu.command).toBe(cpu.command);
     expect(gpu.args[gpu.args.indexOf('--device') + 1]).toBe('cuda');
     expect(cpu.args[cpu.args.indexOf('--device') + 1]).toBe('cpu');
     expect(gpu.args[gpu.args.indexOf('--threads') + 1]).toBe('4');
   });
   it('loads an absolute external model and reports missing companion files', () => {
-    const dir = layout();
+    const l = layout();
     const external = mkdtempSync(join(tmpdir(), 'asr-model-'));
     const model = join(external, 'model.pth.tar');
     writeFileSync(model, 'fixture');
-    expect(launch(manager(dir, model)).error).toContain('cmvn.ark');
+    expect(launch(manager(l, model)).error).toContain('cmvn.ark');
     for (const file of ['cmvn.ark', 'dict.txt', 'train_bpe1000.model']) writeFileSync(join(external, file), 'fixture');
-    const ready = launch(manager(dir, model));
+    const ready = launch(manager(l, model));
     expect(ready.args[ready.args.indexOf('--model-file') + 1]).toBe(model);
-    expect(launch(manager(dir, join(external, 'missing.pth.tar'))).error).toContain('权重文件不存在');
+    expect(launch(manager(l, join(external, 'missing.pth.tar'))).error).toContain('权重文件不存在');
   });
   it('rejects a weights file that is not model.pth.tar instead of silently choosing another model', () => {
-    const dir = layout();
-    const old = join(dir, 'models', 'ggml-large-v3.bin');
+    const l = layout();
+    const old = join(l.models, 'ggml-large-v3.bin');
     writeFileSync(old, 'fixture');
-    expect(launch(manager(dir, old)).error).toContain('model.pth.tar');
+    expect(launch(manager(l, old)).error).toContain('model.pth.tar');
+  });
+  it('reports a missing or incomplete runtime directory before touching the weights', () => {
+    const l = layout();
+    expect(launch(manager({ runtime: '', models: l.models })).error).toContain('未安装');
+    const bare = mkdtempSync(join(tmpdir(), 'asr-bare-'));
+    expect(launch(manager({ runtime: bare, models: l.models })).error).toContain('.venv');
   });
 });
 

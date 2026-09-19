@@ -19,22 +19,26 @@
  * 停顿短于收尾静音的相邻句子并成一条;送去转写用的是更短的那一级门限,所以转写跑在
  * 静音窗里而不是排在它后面。详见 segmenter.ts 的两级门限与 Packer。
  */
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
   ConfigGroup, World, WorldHost, Logger, WorldConsoleDecl, WorldLamp, WorldPanelDecl,
   WorldStreamSocket, ToolDef,
 } from 'cortico/core/types.ts';
 import { nowIso } from 'cortico/core/util.ts';
+import { modelsRoot, runtimesRoot } from 'cortico/paths.ts';
 import { AsrClient, looksHallucinated } from './asr-client.ts';
 import { AsrServerManager, type AsrProfile, type AsrServerState } from './asr-server.ts';
 import { MicCapture, pickDevice, SAMPLE_RATE, type MicDevice } from './capture.ts';
+import { PINNED_SOURCE_REVISION, RuntimeStore, envPlan, type InstallState } from './runtime/env.ts';
+import { MODEL_NAME, ModelStore, type ModelFileState } from './runtime/models.ts';
 import { Packer, Segmenter, type PackConfig, type SegmentConfig, type Utterance } from './segmenter.ts';
 import { applyCorrections, parseCorrections, toSimplified } from './simplify.ts';
 import { AsrStream } from './stream.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
-/** 随包识别后端目录；models/ 仅保留旧部署回退。 */
-const ASR_SERVER_DIR = fileURLToPath(new URL('../runtime/firered-server/', import.meta.url));
+/** 权重根:每个完整的 `<名字>/` 权重组都可选,托管下载的那组叫 FireRedASR2-AED。 */
+const ASR_MODELS_DIR = join(modelsRoot(), 'asr');
 
 /** 一帧的时长:20ms 是电平条跟手与回调开销之间的常用折中 */
 const FRAME_MS = 20;
@@ -113,10 +117,14 @@ export const ASR_DEFAULTS = {
   backend: {
     /** OpenAI 兼容转写端点;自带后端就起在这个端口上 */
     baseUrl: 'http://127.0.0.1:8793/v1',
-    /** 只作标签用;本地后端认的是 models/ 里那份权重 */
+    /** 只作标签用;本地后端认的是 modelFile 指的那份权重 */
     model: 'FireRedASR2-AED',
-    /** model.pth.tar 的绝对路径;相对路径从运行环境的 models/ 解析 */
+    /** model.pth.tar 的绝对路径;相对路径从 <模型根>/asr/ 解析;空 = 面板下载的那组 */
     modelFile: '',
+    /** 自备的运行时目录(含 .venv/ 与 FireRedASR2S/);空 = 面板装的那份 */
+    runtimeDir: '',
+    /** 托管运行时的上游代码 commit;空 = 包里钉住的 */
+    runtimeRevision: '',
     /** 识别结果统一转简体 */
     simplified: true,
     /**
@@ -167,7 +175,8 @@ export interface AsrConfigSection {
   corrections: string;
   streamPort: number;
   backend: {
-    baseUrl: string; model: string; modelFile: string; language: string; simplified: boolean;
+    baseUrl: string; model: string; modelFile: string; runtimeDir: string; runtimeRevision: string;
+    language: string; simplified: boolean;
     autoStart: boolean; timeoutMs: number; profile: AsrProfile; threads: number;
   };
   segment: SegmentConfig;
@@ -217,16 +226,26 @@ export const ASR_CONFIG_GROUP: ConfigGroup = {
       },
       'worlds.asr.backend.model': { type: 'string', title: '模型名', 'x-hot': true },
       'worlds.asr.backend.modelFile': {
-        type: 'string', title: '权重文件', 'x-hot': true,
-        description: '选择 FireRedASR2-AED 目录中的 model.pth.tar；同目录须有 cmvn.ark、dict.txt 和 train_bpe1000.model。换权重后重启后端。',
+        type: 'string', title: '权重文件(自备)', 'x-hot': true,
+        description: '留空用权重目录 <模型根>/asr/FireRedASR2-AED/ 里那组(「收听」面板可一键下载)。'
+          + '填了就用那份 model.pth.tar,同目录须有 cmvn.ark、dict.txt 和 train_bpe1000.model。换权重后重启后端。',
         'x-path': {
           kind: 'file', extensions: ['.tar'],
-          recommendedDir: '../../Cortico-Resources/models/asr/FireRedASR2-AED',
+          recommendedDir: '<模型根>/asr/FireRedASR2-AED',
         },
         'x-download': {
           href: 'https://huggingface.co/FireRedTeam/FireRedASR2-AED/tree/2304afed56eacfee6256dee5937ed22ffa0b64ec',
           label: 'FireRedASR2-AED 模型文件',
         },
+      },
+      'worlds.asr.backend.runtimeDir': {
+        type: 'string', title: '运行时目录(自备)', 'x-hot': true,
+        description: '留空用「收听」面板装到 <运行时根>/firered-asr/ 下的那份。填一个含 .venv/ 与 FireRedASR2S/ 的目录就用它,不再安装。',
+        'x-path': { kind: 'directory' },
+      },
+      'worlds.asr.backend.runtimeRevision': {
+        type: 'string', title: '运行时代码版本', 'x-hot': true,
+        description: '托管安装取 FireRedASR2S 的这个 commit;留空用包里钉住的。改了要重新安装运行时。',
       },
       'worlds.asr.backend.language': {
         type: 'string', title: '语言', enum: ['zh', 'en', 'auto'], 'x-hot': true,
@@ -363,6 +382,22 @@ export function portOf(baseUrl: string, fallback: number): number {
   }
 }
 
+/** 「收听」面板里「运行时与权重」那一块的状态 */
+export interface AsrRuntimeState {
+  revision: string;
+  /** 托管安装的方案名;本平台没有方案时为 null */
+  key: string | null;
+  dir: string;
+  /** 目录是配置给的还是托管装的 */
+  own: boolean;
+  supported: boolean;
+  install: InstallState;
+  models: ModelFileState[];
+  modelsDir: string;
+  modelsSource: string;
+  modelsComplete: boolean;
+}
+
 /** 「收听」面板的一份状态 */
 export interface AsrListenState {
   listening: boolean;
@@ -428,6 +463,8 @@ export class AsrWorld implements World {
   private readonly onOverlayConfig?: (config: AsrOverlayConfig) => void;
   private readonly onModelFile?: (file: string) => void;
   private readonly server: AsrServerManager;
+  private readonly runtimeStore: RuntimeStore;
+  private readonly modelStore: ModelStore;
   private readonly stream: AsrStream;
   private readonly segmenter: Segmenter;
   private readonly packer: Packer;
@@ -479,8 +516,11 @@ export class AsrWorld implements World {
     this.fallbackLog = fwd;
     this.segmenter = new Segmenter(this.cfg.segment, FRAME_MS);
     this.packer = new Packer(this.cfg.pack);
+    this.runtimeStore = new RuntimeStore(runtimesRoot(), fwd);
+    this.modelStore = new ModelStore(join(ASR_MODELS_DIR, MODEL_NAME), fwd);
     this.server = new AsrServerManager({
-      serverDir: ASR_SERVER_DIR,
+      runtimeDir: () => this.runtimeDir(),
+      modelsDir: ASR_MODELS_DIR,
       port: () => portOf(this.cfg.backend.baseUrl, 8793),
       profile: () => this.cfg.backend.profile,
       modelFile: () => this.cfg.backend.modelFile,
@@ -838,6 +878,51 @@ export class AsrWorld implements World {
     };
   }
 
+  // ---- 运行时与权重 -------------------------------------------------------
+
+  private runtimeRevision(): string {
+    return this.cfg.backend.runtimeRevision.trim() || PINNED_SOURCE_REVISION;
+  }
+
+  /** 自备目录优先;否则用托管装好的那份,没装就是空串 */
+  private runtimeDir(): string {
+    const own = this.cfg.backend.runtimeDir.trim();
+    if (own) return own;
+    const plan = envPlan();
+    if (!plan) return '';
+    const dir = this.runtimeStore.dir(this.runtimeRevision(), plan);
+    return this.runtimeStore.installed(dir) ? dir : '';
+  }
+
+  runtimeState(): AsrRuntimeState {
+    const own = this.cfg.backend.runtimeDir.trim().length > 0;
+    const plan = envPlan();
+    const revision = this.runtimeRevision();
+    const dir = plan ? this.runtimeStore.dir(revision, plan) : '';
+    return {
+      revision,
+      key: plan?.key ?? null,
+      dir: own ? this.runtimeDir() : dir,
+      own,
+      supported: plan !== null,
+      install: own
+        ? { phase: 'installed', step: null, line: null, detail: null }
+        : this.runtimeStore.state(dir),
+      models: this.modelStore.states(),
+      modelsDir: this.modelStore.dir,
+      modelsSource: this.modelStore.source,
+      modelsComplete: this.modelStore.complete(),
+    };
+  }
+
+  async installRuntime(): Promise<void> {
+    const plan = envPlan();
+    if (!plan) {
+      throw new Error(`这个平台(${process.platform})没有托管安装方案,请在配置里给出自备的运行时目录`);
+    }
+    await this.runtimeStore.install(this.runtimeRevision(), plan);
+  }
+
   private async invokePanel(panel: string, method: string, args: unknown[]): Promise<unknown> {
     if (panel === 'listen') {
       switch (method) {
@@ -885,6 +970,15 @@ export class AsrWorld implements World {
         case 'server.start': return this.server.start();
         case 'server.stop': return this.server.stop();
         case 'server.state': return this.server.state();
+        case 'runtime': return this.runtimeState();
+        case 'installRuntime': {
+          await this.installRuntime();
+          return this.runtimeState();
+        }
+        case 'downloadModels': {
+          await this.modelStore.downloadMissing();
+          return this.runtimeState();
+        }
         default: throw new Error(`未知面板方法: ${panel}.${method}`);
       }
     }

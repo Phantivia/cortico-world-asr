@@ -5,20 +5,29 @@ import { basename, dirname, isAbsolute, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import type { Logger } from 'cortico/core/types.ts';
+import { pythonExe, runtimeUsable, sourceDir } from './runtime/env.ts';
+import { MODEL_FILES, MODEL_NAME } from './runtime/models.ts';
 
 type AsrServerPhase = 'stopped' | 'starting' | 'running' | 'error';
 export type AsrProfile = 'gpu' | 'cpu';
 export interface AsrServerState {
   phase: AsrServerPhase; url: string; detail: string | null; pid: number | null;
-  reachable: boolean; model: string | null; profile: AsrProfile; installed: boolean; models: string[];
+  reachable: boolean; model: string | null; profile: AsrProfile;
+  /** A usable runtime directory exists (managed or self-provided). */
+  installed: boolean;
+  /** Complete weight sets under `modelsDir`, as `<name>/model.pth.tar`. */
+  models: string[];
+  modelsDir: string;
 }
 interface AsrServerOptions {
-  /** Contains .venv/ and the pinned FireRedASR2S/ source checkout. */
-  serverDir: string;
+  /** Directory holding `.venv/` and `FireRedASR2S/`; empty when no runtime is available. */
+  runtimeDir: () => string;
+  /** `<models root>/asr`; every complete `<name>/` set in it is offered. */
+  modelsDir: string;
   port: () => number;
   host?: string;
   profile: () => AsrProfile;
-  /** Absolute model.pth.tar path, or a path relative to serverDir/models/. */
+  /** Absolute model.pth.tar path, or a path relative to `modelsDir`; empty picks the managed set. */
   modelFile: () => string;
   threads: () => number;
   log: Logger;
@@ -27,23 +36,20 @@ interface AsrServerOptions {
   healthTimeoutMs?: number;
   fetchImpl?: typeof fetch;
 }
-const MODEL_FILES = ['model.pth.tar', 'cmvn.ark', 'dict.txt', 'train_bpe1000.model'];
+const REQUIRED_FILES = MODEL_FILES.map((spec) => spec.file);
 const SERVER_SCRIPT = fileURLToPath(new URL('./firered-server.py', import.meta.url));
 
-export function listModels(serverDir: string): string[] {
-  const dir = join(serverDir, 'models');
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && MODEL_FILES.every((file) => existsSync(join(dir, entry.name, file))))
+export function listModels(modelsDir: string): string[] {
+  if (!existsSync(modelsDir)) return [];
+  return readdirSync(modelsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && REQUIRED_FILES.every((file) => existsSync(join(modelsDir, entry.name, file))))
     .map((entry) => join(entry.name, 'model.pth.tar')).sort();
 }
-export function pickModel(serverDir: string): string | null {
-  const models = listModels(serverDir);
-  return models.find((file) => basename(dirname(file)) === 'FireRedASR2-AED') ?? models[0] ?? null;
+export function pickModel(modelsDir: string): string | null {
+  const models = listModels(modelsDir);
+  return models.find((file) => basename(dirname(file)) === MODEL_NAME) ?? models[0] ?? null;
 }
-export function binPath(serverDir: string): string {
-  return process.platform === 'win32' ? join(serverDir, '.venv', 'Scripts', 'python.exe') : join(serverDir, '.venv', 'bin', 'python');
-}
+export const binPath = pythonExe;
 
 /** Windows venv launchers spawn another Python process; stopping only the launcher leaves the GPU occupied. */
 async function terminate(proc: ChildProcess): Promise<void> {
@@ -81,12 +87,14 @@ export class AsrServerManager {
   async state(): Promise<AsrServerState> {
     const profile = this.opts.profile();
     const modelPath = this.chosenModelPath();
-    const modelReady = modelPath && MODEL_FILES.every(file => existsSync(join(dirname(modelPath), file)));
+    const modelReady = modelPath && REQUIRED_FILES.every(file => existsSync(join(dirname(modelPath), file)));
+    const runtime = this.opts.runtimeDir();
     return {
       phase: this.phase, url: this.url, detail: this.detail, pid: this.proc?.pid ?? null,
       reachable: await this.probe(), model: modelReady ? basename(dirname(modelPath!)) : null, profile,
-      installed: existsSync(binPath(this.opts.serverDir)) && existsSync(join(this.opts.serverDir, 'FireRedASR2S', 'fireredasr2s', '__init__.py')),
-      models: listModels(this.opts.serverDir),
+      installed: runtime !== '' && runtimeUsable(runtime),
+      models: listModels(this.opts.modelsDir),
+      modelsDir: this.opts.modelsDir,
     };
   }
   async start(): Promise<AsrServerState> {
@@ -147,26 +155,25 @@ export class AsrServerManager {
   }
   private chosenModelPath(): string | null {
     const want = this.opts.modelFile().trim();
-    if (want) return isAbsolute(want) ? want : join(this.opts.serverDir, 'models', want);
-    const picked = pickModel(this.opts.serverDir);
-    return picked ? join(this.opts.serverDir, 'models', picked) : null;
+    if (want) return isAbsolute(want) ? want : join(this.opts.modelsDir, want);
+    const picked = pickModel(this.opts.modelsDir);
+    return picked ? join(this.opts.modelsDir, picked) : null;
   }
   private resolveLaunch(): { command: string; args: string[]; cwd?: string } | { error: string } {
     if (this.opts.commandOverride) return this.opts.commandOverride;
-    const exe = binPath(this.opts.serverDir);
-    const source = join(this.opts.serverDir, 'FireRedASR2S');
-    if (!existsSync(exe) || !existsSync(join(source, 'fireredasr2s', '__init__.py'))) {
-      return { error: `缺文件: FireRed 运行环境未安装(${this.opts.serverDir});运行 scripts/setup-firered-asr.ps1` };
+    const runtime = this.opts.runtimeDir();
+    if (!runtime || !runtimeUsable(runtime)) {
+      return { error: `缺文件: ${runtime ? `${runtime} 里没有 .venv 与 FireRedASR2S` : '识别运行时未安装'};在「收听」面板安装,或在配置里给出自备目录` };
     }
     const model = this.chosenModelPath();
-    if (!model) return { error: '缺权重: 请选择 FireRedASR2-AED 的 model.pth.tar' };
+    if (!model) return { error: '缺权重: 在「收听」面板下载 FireRedASR2-AED,或选择自备的 model.pth.tar' };
     if (!existsSync(model)) return { error: `权重文件不存在: ${model}` };
     if (basename(model) !== 'model.pth.tar') return { error: '请选择 FireRedASR2-AED 的 model.pth.tar' };
-    for (const file of MODEL_FILES) {
+    for (const file of REQUIRED_FILES) {
       if (!existsSync(join(dirname(model), file))) return { error: `缺权重配套文件: ${join(dirname(model), file)}` };
     }
-    return { command: exe, cwd: this.opts.serverDir,
-      args: [SERVER_SCRIPT, '--host', this.host, '--port', String(this.opts.port()), '--source-dir', source,
+    return { command: pythonExe(runtime), cwd: runtime,
+      args: [SERVER_SCRIPT, '--host', this.host, '--port', String(this.opts.port()), '--source-dir', sourceDir(runtime),
         '--model-file', model, '--device', this.opts.profile() === 'gpu' ? 'cuda' : 'cpu', '--threads', String(this.opts.threads() || 4)],
     };
   }

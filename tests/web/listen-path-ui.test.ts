@@ -62,7 +62,7 @@ afterEach(() => {
 
 describe('ASR 外部权重错误', () => {
   it('显式路径不存在时展示后端给出的具体路径，不退回旧 runtime/models 提示', async () => {
-    const missing = 'D:\\Cortico-Resources\\models\\asr\\missing.bin';
+    const missing = 'D:\\weights\\asr\\missing.bin';
     const lifecycle = new Lifecycle();
     const root = doc.createElement('div');
     doc.body.appendChild(root);
@@ -90,6 +90,7 @@ describe('ASR 外部权重错误', () => {
         profile: 'gpu',
         installed: true,
         models: [],
+        modelsDir: 'D:\\weights\\asr',
       },
       endpoint: 'http://127.0.0.1:8178/inference',
       detail: null,
