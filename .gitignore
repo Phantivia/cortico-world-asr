@@ -1,5 +1,7 @@
 node_modules/
 dist/
+scratch/
 *.log
-# FireRed 的 Python 环境、上游代码与权重都装在这里,不进版本库。
-runtime/
+__pycache__/
+# 本机实验用的 Python 环境不进版本库;只匹配包根下的这一个目录。
+/runtime/

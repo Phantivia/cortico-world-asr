@@ -4,6 +4,10 @@
   "type": "module",
   "description": "Cortico World: microphone speech recognition — RtAudio capture, energy-gated segmentation, FireRedASR2-AED backend, subtitle overlay",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Phantivia/cortico-world-asr.git"
+  },
   "keywords": [
     "cortico-world",
     "cortico",
@@ -26,7 +30,9 @@
     "src",
     "dist",
     "scripts",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "node scripts/build-console.mjs",
