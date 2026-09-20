@@ -8,6 +8,10 @@
     "type": "git",
     "url": "https://github.com/Phantivia/cortico-world-asr.git"
   },
+  "homepage": "https://github.com/Phantivia/cortico-world-asr#readme",
+  "bugs": {
+    "url": "https://github.com/Phantivia/cortico-world-asr/issues"
+  },
   "keywords": [
     "cortico-world",
     "cortico",
