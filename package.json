@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "cortico": "^0.1.5",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "tsx": "^4.19.2",

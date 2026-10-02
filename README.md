@@ -17,8 +17,10 @@ Owner: `src/definition.ts`
 
 运行时它以 `cortico/<框架 src 下的路径>` import 框架(`cortico/world.ts`、`cortico/core/types.ts`、
 `cortico/paths.ts` …),由框架 `src/extensions/runtime.ts` 注册的模块钩子解析到框架源码本身,扩展与框架
-共用同一份实例,所以包必须是 `"type": "module"`。开发期 `tsconfig.json` 与 `vitest.config.ts` 把同一前缀
-指到同级的框架 checkout(`../BOT/src/`)。浏览器侧(`src/console/**`)对 `cortico/*` 只 `import type`。
+共用同一份实例,所以包必须是 `"type": "module"`。开发期同一前缀经 devDependency `cortico`(npm 上的框架包,
+`exports` 把 `./*` 映射到 `./src/*`)解析。要对着本地未发版的框架改动开发,在本目录执行
+`pnpm link <框架 checkout>`;它会往 `pnpm-workspace.yaml` 写一条 `overrides`,提交前撤掉。浏览器侧
+(`src/console/**`)对 `cortico/*` 只 `import type`。
 
 ## 安装
 
