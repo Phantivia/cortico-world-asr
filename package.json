@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "type": "module",
   "description": "Cortico World: microphone speech recognition — RtAudio capture, energy-gated segmentation, FireRedASR2-AED backend, subtitle overlay",
+  "author": "Phantivia",
   "license": "MIT",
   "repository": {
     "type": "git",
