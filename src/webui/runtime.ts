@@ -2,7 +2,7 @@
  * 「运行时与权重」:接在「收听」面板下面的第二张卡。运行时是 FireRedASR2S 的 Python 环境,
  * 权重是 FireRedASR2-AED 的四个文件;两样都装到部署根下,安装与下载各一颗键。
  */
-import type { ConsolePanelContext } from 'cortico/web/shared/client-panel.ts';
+import type { WebUiPanelContext } from 'cortico/web/shared/client-panel.ts';
 import { errText, type AsrRuntimeState } from './client.ts';
 
 const DESC =
@@ -18,7 +18,7 @@ function progressText(done: number, total: number | null): string {
   return total ? `${gb(done)} / ${gb(total)}(${Math.round((done / total) * 100)}%)` : gb(done);
 }
 
-export function mountRuntimeSection(ctx: ConsolePanelContext): void {
+export function mountRuntimeSection(ctx: WebUiPanelContext): void {
   const { ui } = ctx;
   const card = ui.sheet({ title: '运行时与权重', en: 'runtime', desc: DESC });
 

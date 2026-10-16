@@ -1,6 +1,6 @@
 {
   "name": "cortico-world-asr",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "description": "Cortico World: microphone speech recognition — RtAudio capture, energy-gated segmentation, FireRedASR2-AED backend, subtitle overlay",
   "author": "Phantivia",
@@ -27,9 +27,10 @@
   "main": "./src/index.ts",
   "cortico": {
     "kind": "world",
-    "api": 5,
-    "consoleClient": "dist/console.js",
-    "consoleStyle": "dist/console.css"
+    "api": 6,
+    "webUiClient": "dist/webui.js",
+    "webUiStyle": "dist/webui.css",
+    "describe": "describe.json"
   },
   "files": [
     "src",
@@ -37,10 +38,12 @@
     "scripts",
     "README.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md",
+    "describe.json"
   ],
   "scripts": {
-    "build": "node scripts/build-console.mjs",
+    "build": "node scripts/build-webui.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -50,7 +53,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "cortico": "^0.1.5",
+    "cortico": "^0.2.0",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "tsx": "^4.19.2",

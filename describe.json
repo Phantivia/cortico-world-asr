@@ -1,0 +1,20 @@
+{
+  "tools": [],
+  "events": [
+    {
+      "type": "asr.speech",
+      "description": {
+        "zh": "从麦克风识别出的话,前面标着说话人的称呼。开了「听见就叫醒」(worlds.asr.wake)时立即投递,否则与其他事件合批。",
+        "en": "Speech recognized from the microphone, prefixed with the speaker name. Delivered at once when worlds.asr.wake is on; otherwise batched with other events."
+      }
+    }
+  ],
+  "prompts": [
+    {
+      "key": "worlds.asr.envPrompt",
+      "title": "语音识别 · 环境提示词",
+      "role": "envPrompt",
+      "content": "你听得见麦克风。{{asr.speaker}}说的话会作为事件送到你眼前,形如\n`[语音] {{asr.speaker}}:……`。\n\n注意这是语音识别的结果，可能有缺字或者同音字错误等问题，\n读到不对的地方先按识别出错处理，尽量猜一下原本想说的是什么。真听不明白直接就说没听清。"
+    }
+  ]
+}

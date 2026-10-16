@@ -13,4 +13,16 @@ export const ASR: WorldDefinition<AsrConfigSection> = {
       onOverlayConfig: (overlay) => ctx.persist({ overlay }),
       onModelFile: (modelFile) => ctx.persist({ backend: { modelFile } }),
     }),
+  describe: {
+    tools: [],
+    events: [
+      {
+        type: 'asr.speech',
+        description: {
+          zh: '从麦克风识别出的话,前面标着说话人的称呼。开了「听见就叫醒」(worlds.asr.wake)时立即投递,否则与其他事件合批。',
+          en: 'Speech recognized from the microphone, prefixed with the speaker name. Delivered at once when worlds.asr.wake is on; otherwise batched with other events.',
+        },
+      },
+    ],
+  },
 };

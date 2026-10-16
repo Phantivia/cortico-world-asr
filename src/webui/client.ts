@@ -6,12 +6,12 @@
  * DOM 一律用 `ctx.ui` 原语,定时器一律 `ctx.interval`。
  *
  * `style.css` 是本 provider 自己的样式,只放 `ctx.ui` 没有对应原语的那两块
- * (电平条、字幕预览框),用 `asr-` 前缀避开控制台的通用 class。
+ * (电平条、字幕预览框),用 `asr-` 前缀避开 WebUI 的通用 class。
  */
 
 import type {
-  ConsoleClientBundle,
-  ConsolePanelContext,
+  WebUiClientBundle,
+  WebUiPanelContext,
 } from 'cortico/web/shared/client-panel.ts';
 import './style.css';
 import { listenPanel } from './listen.ts';
@@ -127,7 +127,7 @@ interface AsrMsgLine {
   say(text?: string | null, bad?: boolean): void;
 }
 
-export function msgLine(ctx: ConsolePanelContext, cls?: string): AsrMsgLine {
+export function msgLine(ctx: WebUiPanelContext, cls?: string): AsrMsgLine {
   const el = ctx.ui.msgline('');
   if (cls) el.classList.add(cls);
   return {
@@ -141,7 +141,7 @@ export function msgLine(ctx: ConsolePanelContext, cls?: string): AsrMsgLine {
 
 // ---------------------------------------------------------------------------
 
-const bundle: ConsoleClientBundle = {
+const bundle: WebUiClientBundle = {
   panels: {
     listen: listenPanel,
     overlay: overlayPanel,

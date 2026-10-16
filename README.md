@@ -12,7 +12,7 @@ Owner: `src/definition.ts`
 这是一个扩展包。它按 Cortico 的扩展契约声明自己:
 
 ```jsonc
-"cortico": { "kind": "world", "api": 4, "consoleClient": "dist/console.js", "consoleStyle": "dist/console.css" }
+"cortico": { "kind": "world", "api": 6, "webUiClient": "dist/webui.js", "webUiStyle": "dist/webui.css" }
 ```
 
 运行时它以 `cortico/<框架 src 下的路径>` import 框架(`cortico/world.ts`、`cortico/core/types.ts`、
@@ -20,25 +20,25 @@ Owner: `src/definition.ts`
 共用同一份实例,所以包必须是 `"type": "module"`。开发期同一前缀经 devDependency `cortico`(npm 上的框架包,
 `exports` 把 `./*` 映射到 `./src/*`)解析。要对着本地未发版的框架改动开发,在本目录执行
 `pnpm link <框架 checkout>`;它会往 `pnpm-workspace.yaml` 写一条 `overrides`,提交前撤掉。浏览器侧
-(`src/console/**`)对 `cortico/*` 只 `import type`。
+(`src/webui/**`)对 `cortico/*` 只 `import type`。
 
 ## 安装
 
-先在本目录构建面板产物(`dist/` 不进版本库,没有它控制台的语音识别页是空的):
+先在本目录构建面板产物(`dist/` 不进版本库,没有它 WebUI 的语音识别页是空的):
 
 ```bash
 corepack pnpm install
 corepack pnpm build
 ```
 
-然后二选一:控制台「扩展」页手动安装,填本目录的绝对路径;或在 `<Cortico>/extensions/` 下
+然后二选一:WebUI「扩展」页手动安装,填本目录的绝对路径;或在 `<Cortico>/extensions/` 下
 `corepack pnpm add --ignore-workspace <本目录绝对路径>`。装完整进程重启 Cortico。
 
 识别后端的运行时与权重另装,见下一节。
 
 ## 运行时与权重
 
-World 不带推理代码、Python 环境,也不带权重;控制台「收听」面板下面那张「运行时与权重」卡负责把它们取来:
+World 不带推理代码、Python 环境,也不带权重;WebUI「收听」面板下面那张「运行时与权重」卡负责把它们取来:
 
 - **运行时**是 FireRedASR2S 的 Python 环境,装到 `<运行时根>/firered-asr/<commit>/cu128/`:
   `git` 取上游代码并钉在 `4e7d9aaf`,`uv` 建 Python 3.12 环境、装 PyTorch 2.9.1(cu128 wheel,约 3 GB)
@@ -75,7 +75,7 @@ tsx scripts/check-asr-runtime.ts --cpu    # CPU 档
 ```bash
 corepack pnpm typecheck   # tsc --noEmit,Node 侧与浏览器侧一份配置一起 check
 corepack pnpm test        # vitest run
-corepack pnpm build       # esbuild → dist/console.{js,css}
+corepack pnpm build       # esbuild → dist/webui.{js,css}
 ```
 
 测试全程不联网、不开声卡、不起 Python:运行时安装用假的命令执行器断言每一步与目录协议,
@@ -93,8 +93,8 @@ firered-server.py 本地端点:把 /v1/audio/transcriptions 接到 FireRedASR2-A
 runtime/env.ts    运行时安装:git + uv 建出的 Python 环境,一个 commit 一个目录
 runtime/models.ts 权重下载:四个文件,固定 revision
 stream.ts         /overlay 字幕页 + SSE /stream(自有端口)
-overlay/          字幕页三件套(OBS 浏览器源与控制台预览是同一份)
-console/          控制台扩展:收听(含运行时与权重)/ Overlay 字幕 两个面板
+overlay/          字幕页三件套(OBS 浏览器源与 WebUI 预览是同一份)
+webui/            WebUI 面板:收听(含运行时与权重)/ Overlay 字幕 两个面板
 world.ts          装配:配置、面板、事件投递
 ```
 
@@ -192,18 +192,18 @@ whisper 系模型在纯噪声上会稳定地吐出训练集里的高频片段("�
 
 `stream.ts` 起一个自己的 HTTP 口(`worlds.asr.streamPort`,被占顺延):
 `/overlay` 是字幕页,`/stream` 是它的 SSE 数据面。OBS 加一个浏览器源指到 `/overlay`,
-控制台的预览用 iframe 嵌**同一个页面**(带 `?bg=dim` 给个暗底)——两份渲染意味着
+WebUI 的预览用 iframe 嵌**同一个页面**(带 `?bg=dim` 给个暗底)——两份渲染意味着
 "预览里好看、OBS 里不对"这类问题永远查不清。
 
 URL 参数按订阅方覆盖:`?lines=3` 只留三行、`?partial=0` 不显示"正在说…"。
 样式(字号、字重、颜色、描边、底板、字体、保留行数、停留时长)在面板上改,
 服务端钳完值经 SSE 热推给所有订阅者,OBS 那份不用重开;同时经装配层写回 config.json。
 
-## 控制台面板
+## WebUI 面板
 
 - **收听(listen)**:麦克风选择、带门槛刻度的电平条、识别后端启停、实时识别文本,以及下面
   那张「运行时与权重」卡(安装运行时、下载权重、看进度)。电平与文本走 `ctx.stream`
-  (World 的 `WorldConsoleDecl.stream`)实时推,计数与后端状态五秒轮一次。
+  (World 的 `WorldWebUiDecl.stream`)实时推,计数与后端状态五秒轮一次。
 - **Overlay 字幕(overlay)**:链接、样式、试显、预览。
 
 ## 挂载

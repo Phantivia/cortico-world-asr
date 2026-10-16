@@ -1,4 +1,4 @@
-/* 识别字幕 overlay:透明底,供 OBS browser source 合成与控制台 iframe 预览。
+/* 识别字幕 overlay:透明底,供 OBS browser source 合成与 WebUI iframe 预览。
    样式参数来自服务端配置(overlay.config),以 CSS 变量落在 .stage 上。 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -8,7 +8,7 @@ html, body {
   background: transparent;
   overflow: hidden;
 }
-/* ?bg=dim:控制台预览用的暗背景;正式合成不带这个参数,保持透明 */
+/* ?bg=dim:WebUI 预览用的暗背景;正式合成不带这个参数,保持透明 */
 body.bg-dim { background: #1c1a17; }
 
 .stage {

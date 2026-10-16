@@ -1,5 +1,5 @@
 /**
- * AsrWorld:声卡 → 切分 → 识别 → 打包投递这条链,以及控制台面板。
+ * AsrWorld:声卡 → 切分 → 识别 → 打包投递这条链,以及 WebUI 面板。
  *
  * 声卡与识别端点都由注入替身顶掉——前者本机不一定有,后者要真跑一台 whisper。
  * 替身之外的每一段(切分、幻觉过滤、攒批、投递口径、面板状态)都是真代码。
@@ -87,7 +87,7 @@ describe('World 面', () => {
   });
 
   it('面板声明是局部 id + 真标题', () => {
-    const decl = new AsrWorld({ cfg: cfg() }).console();
+    const decl = new AsrWorld({ cfg: cfg() }).webUi();
     expect(decl.panels?.map((p) => p.id)).toEqual(['listen', 'overlay']);
     for (const p of decl.panels ?? []) expect(p.description).toBeTruthy();
     expect(decl.config?.map((g) => g.id)).toEqual(['world:asr', 'world:asr:segment']);
@@ -95,7 +95,7 @@ describe('World 面', () => {
   });
 
   it('声明的每个配置键都能在默认值里找到落点', () => {
-    const decl = new AsrWorld({ cfg: cfg() }).console();
+    const decl = new AsrWorld({ cfg: cfg() }).webUi();
     for (const group of decl.config ?? []) {
       for (const key of Object.keys(group.schema.properties)) {
         const path = key.split('.').slice(1); // 去掉 worlds. 前缀
@@ -311,7 +311,7 @@ describe('一条链:说话 → 识别 → 投递', () => {
   });
 
   // start() 从不拉起后端(只有面板与 setModel 会),stop() 却会杀掉它:core 重启一次,
-  // 就变成麦克风在收、后端已死,而控制台仍显示已启动。
+  // 就变成麦克风在收、后端已死,而 WebUI 仍显示已启动。
   it('关掉自动拉起:启动时探不通就 warn,并把「后端未就绪」摆到面板上', async () => {
     const { m, invoke } = rig({ backend: { ...ASR_DEFAULTS.backend, baseUrl: 'http://127.0.0.1:1/v1', autoStart: false } });
     const host = new FakeHost();

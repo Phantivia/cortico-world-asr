@@ -3,9 +3,9 @@
  *
  * 只放 `ctx.ui` 没有对应原语的那三块:电平条(带门槛刻度)、一行排开的表单块、
  * 字幕预览框。其余一律用原语(sheet / rowbar / section / btn / kv / log / stat /
- * field / checkbox / select),那些 class 归控制台管,这里一个字都不覆盖。
+ * field / checkbox / select),那些 class 归 WebUI 管,这里一个字都不覆盖。
  *
- * 两条自律(与 mc、QQ 那两份同源):类名一律 `asr-` 前缀;颜色只用控制台的主题变量。
+ * 两条自律(与 mc、QQ 那两份同源):类名一律 `asr-` 前缀;颜色只用 WebUI 的主题变量。
  *
  * 电平条不用 `ui.progress`:那是"这个数占多少"的读数条,而这里要的是**门槛刻度**
  * ——条走到哪不重要,过没过那道线才是唯一要看的事。

@@ -8,8 +8,8 @@
  */
 
 import type {
-  ConsolePanelContext,
-  ConsolePanel,
+  WebUiPanelContext,
+  WebUiPanel,
 } from 'cortico/web/shared/client-panel.ts';
 import {
   errText,
@@ -22,8 +22,8 @@ const DESC =
   'OBS 里加一个浏览器源,地址填下面这条,尺寸按画布来。字幕样式改完即时生效,'
   + 'OBS 那份不用重开。字体填 OBS 那台机器上装了的字体名。';
 
-export const overlayPanel: ConsolePanel = {
-  mount(ctx: ConsolePanelContext) {
+export const overlayPanel: WebUiPanel = {
+  mount(ctx: WebUiPanelContext) {
     const { ui, root } = ctx;
     const card = ui.sheet({ title: 'Overlay 字幕', en: 'subtitle overlay', desc: DESC });
     const s = card.body;
