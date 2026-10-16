@@ -22,7 +22,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
-  ConfigGroup, World, WorldHost, Logger, WorldConsoleDecl, WorldLamp, WorldPanelDecl,
+  ConfigGroup, World, WorldHost, Logger, WorldWebUiDecl, WorldLamp, WorldPanelDecl,
   WorldStreamSocket, ToolDef,
 } from 'cortico/core/types.ts';
 import { nowIso } from 'cortico/core/util.ts';
@@ -44,7 +44,7 @@ const ASR_MODELS_DIR = join(modelsRoot(), 'asr');
 const FRAME_MS = 20;
 /** 电平与面板状态的推送节拍；转写和打包不依赖这只轮询钟。 */
 const TICK_MS = 100;
-/** 控制台与 overlay 各留多少条最近文本 */
+/** WebUI 与 overlay 各留多少条最近文本 */
 const RECENT_CAP = 50;
 /** 识别失败的告警间隔:后端一死就每句失败一次,原样刷屏会淹掉别的日志 */
 const FAIL_WARN_GAP_MS = 60_000;
@@ -54,7 +54,7 @@ export const ASR_PANEL_DECLS: readonly WorldPanelDecl[] = [
   { id: 'overlay', title: 'Overlay 字幕', description: '推流链接、字幕样式与试显。' },
 ];
 
-/** overlay 字幕样式;控制台面板改,经装配层回写 config.json,SSE 热推给所有 overlay 页 */
+/** overlay 字幕样式;WebUI 面板改,经装配层回写 config.json,SSE 热推给所有 overlay 页 */
 export interface AsrSubtitleStyle {
   /** 字号倍率(0.5–2.5) */
   scale: number;
@@ -100,7 +100,7 @@ export const ASR_DEFAULTS = {
   enabled: false,
   /** 麦克风名字子串;空 = 系统默认输入设备 */
   device: '',
-  /** World 启动就开始听;关掉则只在控制台按下"开始收听"时听 */
+  /** World 启动就开始听;关掉则只在 WebUI 按下"开始收听"时听 */
   autoListen: true,
   /** 说话人在事件里怎么称呼。识别不出是谁在说,这就是那个"谁" */
   speaker: '麦克风前的人',
@@ -502,7 +502,7 @@ export class AsrWorld implements World {
     this.onModelFile = opts.onModelFile;
     this.clientOverride = opts.clientOverride;
     this.overlayCfg = clampOverlay(opts.cfg.overlay, ASR_OVERLAY_DEFAULTS);
-    // host 挂载在 start();控制台可能在此之前用到后端管理器,日志经转发器现取
+    // host 挂载在 start();WebUI 可能在此之前用到后端管理器,日志经转发器现取
     const forward = (get: () => Logger | undefined): Logger => ({
       child: (sub) => forward(() => get()?.child(sub)),
       trace: (m, d) => get()?.trace(m, d),
@@ -794,7 +794,7 @@ export class AsrWorld implements World {
     for (const s of this.panelSockets) s.send(payload);
   }
 
-  // ---- 控制台 -------------------------------------------------------------
+  // ---- WebUI -------------------------------------------------------------
 
   /**
    * 三条链路各一颗:麦、识别后端、字幕页。
@@ -832,7 +832,7 @@ export class AsrWorld implements World {
     ];
   }
 
-  console(): WorldConsoleDecl {
+  webUi(): WorldWebUiDecl {
     const last = this.recent[0];
     return {
       lamps: this.lamps(),

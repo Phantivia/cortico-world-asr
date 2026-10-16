@@ -108,7 +108,7 @@ interface MicCaptureOptions {
 }
 
 /**
- * 一路输入流。`start` 返回错误措辞(成功为 null)——采集失败是控制台要显示的
+ * 一路输入流。`start` 返回错误措辞(成功为 null)——采集失败是 WebUI 要显示的
  * 事实,不是异常路径。
  */
 export class MicCapture {

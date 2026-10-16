@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const UI = 'cortico/web/client/ui/index.ts';
 const LIFECYCLE = 'cortico/web/client/core/lifecycle.ts';
-const ASR_LISTEN = '../../src/console/listen.ts';
+const ASR_LISTEN = '../../src/webui/listen.ts';
 
 // Browser sources are checked by tsconfig.web.json; keeping their specifiers indirect
 // prevents the Node-only root config from pulling DOM worlds into its source graph.
@@ -17,7 +17,7 @@ type Any = any;
 
 const doc = (globalThis as Any).document;
 
-const { createConsoleUi } = (await import(UI)) as Any;
+const { createWebUi } = (await import(UI)) as Any;
 const { Lifecycle } = (await import(LIFECYCLE)) as Any;
 const { listenPanel } = (await import(ASR_LISTEN)) as Any;
 
@@ -66,7 +66,7 @@ describe('ASR 外部权重错误', () => {
     const lifecycle = new Lifecycle();
     const root = doc.createElement('div');
     doc.body.appendChild(root);
-    const ui = createConsoleUi({ memo: memo(), overlayHost: doc.body, signal: lifecycle.signal, doc });
+    const ui = createWebUi({ memo: memo(), overlayHost: doc.body, signal: lifecycle.signal, doc });
     const state = {
       listening: false,
       audioAvailable: true,

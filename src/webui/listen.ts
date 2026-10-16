@@ -10,8 +10,8 @@
  */
 
 import type {
-  ConsolePanelContext,
-  ConsolePanel,
+  WebUiPanelContext,
+  WebUiPanel,
 } from 'cortico/web/shared/client-panel.ts';
 import {
   errText,
@@ -35,8 +35,8 @@ function pct(db: number): number {
   return Math.max(0, Math.min(100, ((db - FLOOR_DB) / -FLOOR_DB) * 100));
 }
 
-export const listenPanel: ConsolePanel = {
-  mount(ctx: ConsolePanelContext) {
+export const listenPanel: WebUiPanel = {
+  mount(ctx: WebUiPanelContext) {
     const { ui, root } = ctx;
     const card = ui.sheet({ title: '收听', en: 'listen', desc: DESC });
     const s = card.body;

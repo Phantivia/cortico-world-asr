@@ -1,6 +1,6 @@
 /**
- * 面板 bundle:`src/console/client.ts` → `dist/console.js` + `dist/console.css`。
- * 两个产物名写死在 package.json 的 `cortico.consoleClient` / `consoleStyle` 里,
+ * 面板 bundle:`src/webui/client.ts` → `dist/webui.js` + `dist/webui.css`。
+ * 两个产物名写死在 package.json 的 `cortico.webUiClient` / `webUiStyle` 里,
  * 服务端自己给它们分配 URL。
  *
  * 不给 `cortico/*` 配 alias 也不 external:浏览器侧只允许 `import type` 框架,
@@ -18,7 +18,7 @@ rmSync(outdir, { recursive: true, force: true });
 mkdirSync(outdir, { recursive: true });
 
 const result = await esbuild.build({
-  entryPoints: [{ in: `${root}src/console/client.ts`, out: 'console' }],
+  entryPoints: [{ in: `${root}src/webui/client.ts`, out: 'webui' }],
   outdir,
   bundle: true,
   format: 'esm',

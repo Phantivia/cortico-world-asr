@@ -2,8 +2,8 @@
  * 识别流服务:worlds-asr 的对外网络面。
  *
  * - `GET /overlay`(页面):实时字幕层,透明底。OBS browser source 订这里,
- *   控制台的 overlay 面板也用 iframe 嵌同一份——**只有一份渲染实现**。
- * - `GET /stream`(SSE,单向广播):overlay 与控制台面板共用的数据面。
+ *   WebUI 的 overlay 面板也用 iframe 嵌同一份——**只有一份渲染实现**。
+ * - `GET /stream`(SSE,单向广播):overlay 与 WebUI 面板共用的数据面。
  *   事件前向兼容:只加新类型不改旧的,订阅者忽略不认识的 type。
  *
  * 单向订阅用 SSE 而不是 WS:传输层物理上长不出"订阅者回话"的分支,断线续传
@@ -62,7 +62,7 @@ export class AsrStream {
     return this.http !== null;
   }
 
-  /** 订阅者数(overlay 页 / OBS browser source / 控制台面板) */
+  /** 订阅者数(overlay 页 / OBS browser source / WebUI 面板) */
   get subscriberCount(): number {
     return this.subscribers.size;
   }
@@ -165,7 +165,7 @@ export class AsrStream {
       'Cache-Control': 'no-cache, no-store, no-transform',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
-      // 订阅是公开单向面:控制台在另一个端口,OBS 在另一个进程
+      // 订阅是公开单向面:WebUI 在另一个端口,OBS 在另一个进程
       'Access-Control-Allow-Origin': '*',
     });
     res.flushHeaders();
